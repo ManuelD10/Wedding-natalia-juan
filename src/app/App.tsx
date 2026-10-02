@@ -1,16 +1,142 @@
-import { useState, useEffect } from "react";
-import { motion } from "motion/react";
+import { useState, useEffect, useRef } from "react";
+import emailjs from "@emailjs/browser";
+import { motion, AnimatePresence } from "motion/react";
 
 import bgSection1 from "@/imports/background-section_1.png";
 import bgSection2 from "@/imports/background-section_2.png";
 import bgSection5 from "@/imports/background-section_5.png";
 import fotoLugar from "@/imports/foto-lugar.png";
 import mapaLugar from "@/imports/mapa-lugar.png";
-import outfitMujeres from "@/imports/outfit-mujeres.png";
+import outfitMujeres from "@/imports/outfit-mujeres.jpeg";
 import outfitHombres from "@/imports/outfit-hombres.png";
 import sobreImg from "@/imports/sobre.png";
+import cancionBoda from "@/imports/cancion_boda.mp3";
 
 const TARGET = new Date("2027-02-20T17:00:00");
+
+function MusicPlayer() {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [volume, setVolume] = useState(33);
+  const [muted, setMuted] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const audio = new Audio(cancionBoda);
+    audio.loop = true;
+    audio.volume = 0.33;
+    audioRef.current = audio;
+
+    // Autoplay: intentamos reproducir directamente
+    const attempt = audio.play();
+    if (attempt) {
+      attempt
+        .then(() => setPlaying(true))
+        .catch(() => {
+          // Bloqueado por política del navegador — se activa con primer toque
+          const unlock = () => {
+            audio.play().then(() => setPlaying(true)).catch(() => {});
+            document.removeEventListener("click", unlock);
+            document.removeEventListener("touchstart", unlock);
+          };
+          document.addEventListener("click", unlock, { once: true });
+          document.addEventListener("touchstart", unlock, { once: true });
+        });
+    }
+
+    return () => { audio.pause(); audio.src = ""; };
+  }, []);
+
+  const handleVolumeChange = (v: number) => {
+    setVolume(v);
+    if (audioRef.current) {
+      audioRef.current.volume = v / 100;
+      audioRef.current.muted = v === 0;
+    }
+    setMuted(v === 0);
+  };
+
+  const toggleMute = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (muted) {
+      audio.muted = false;
+      audio.volume = (volume || 33) / 100;
+      setMuted(false);
+    } else {
+      audio.muted = true;
+      setMuted(true);
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 right-5 z-50 flex flex-col items-end gap-2">
+      {/* Volume slider — expands upward */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, scaleY: 0, originY: 1 }}
+            animate={{ opacity: 1, scaleY: 1 }}
+            exit={{ opacity: 0, scaleY: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="flex flex-col items-center gap-2 rounded-2xl px-3 py-4 shadow-xl"
+            style={{ backgroundColor: "rgba(58,34,16,0.92)", backdropFilter: "blur(8px)" }}
+          >
+            <span className="text-[9px] tracking-[0.2em] uppercase" style={{ color: "rgba(255,255,255,0.45)", fontFamily: "'Inria Serif', serif" }}>
+              {muted ? "silencio" : `${volume}%`}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={muted ? 0 : volume}
+              onChange={e => handleVolumeChange(Number(e.target.value))}
+              className="h-24 cursor-pointer"
+              style={{
+                writingMode: "vertical-lr",
+                direction: "rtl",
+                accentColor: "#C9A96E",
+              } as React.CSSProperties}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main button */}
+      <button
+        onClick={() => setExpanded(prev => !prev)}
+        onDoubleClick={toggleMute}
+        className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-95 hover:scale-105"
+        style={{ backgroundColor: "rgba(58,34,16,0.9)", backdropFilter: "blur(8px)" }}
+        aria-label="Control de música"
+        title="Toca para abrir el volumen · Doble toque para silenciar"
+      >
+        {!playing ? (
+          // Music note — waiting for autoplay permission
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18V5l12-2v13" stroke="rgba(255,255,255,0.55)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="6" cy="18" r="3" stroke="#C9A96E" strokeWidth="1.6"/>
+            <circle cx="18" cy="16" r="3" stroke="#C9A96E" strokeWidth="1.6"/>
+          </svg>
+        ) : muted || volume === 0 ? (
+          // Muted icon
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M11 5L6 9H2v6h4l5 4V5z" fill="rgba(255,255,255,0.55)"/>
+            <line x1="23" y1="9" x2="17" y2="15" stroke="#C9A96E" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="17" y1="9" x2="23" y2="15" stroke="#C9A96E" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+        ) : (
+          // Speaker icon
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M11 5L6 9H2v6h4l5 4V5z" fill="rgba(255,255,255,0.55)"/>
+            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="#C9A96E" strokeWidth="1.6" strokeLinecap="round"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" stroke="#C9A96E" strokeWidth="1.6" strokeLinecap="round"/>
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
 
 function useCountdown() {
   const calc = () => {
@@ -51,16 +177,38 @@ export default function App() {
   const { days, hours, minutes, seconds } = useCountdown();
   const [form, setForm] = useState({ name: "", guests: "1", attending: "yes", message: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setSending(true);
+    setSendError(false);
+    try {
+      await emailjs.send(
+        "service_ubly28f",
+        "template_ix04l7f",
+        {
+          name: form.name,
+          attending: form.attending === "yes" ? "✅ Sí asistirá" : "❌ No podrá asistir",
+          guests: form.attending === "yes" ? form.guests : "—",
+          message: form.message || "Sin mensaje",
+        },
+        "yr7HUpHM_JAROPiiJ"
+      );
+      setSubmitted(true);
+    } catch {
+      setSendError(true);
+    } finally {
+      setSending(false);
+    }
   };
 
   const pad = (n: number) => String(n).padStart(2, "0");
 
   return (
     <div style={{ fontFamily: "'Jost', sans-serif" }} className="overflow-x-hidden">
+      <MusicPlayer />
 
       {/* ══════════════════════════════════════
           SECCIÓN 1 · HERO + CUENTA REGRESIVA
@@ -615,12 +763,18 @@ export default function App() {
                 />
               </div>
 
+              {sendError && (
+                <p className="text-center text-sm" style={{ color: "#b91c1c", fontFamily: "'Inria Serif', serif" }}>
+                  Hubo un problema al enviar. Por favor intenta de nuevo.
+                </p>
+              )}
               <button
                 type="submit"
-                className="w-full text-white py-4 rounded-xl text-[11px] tracking-[0.3em] uppercase font-medium transition-all hover:opacity-90 active:scale-[0.99]"
+                disabled={sending}
+                className="w-full text-white py-4 rounded-xl text-[11px] tracking-[0.3em] uppercase font-medium transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-60"
                 style={{ backgroundColor: "#543A27" }}
               >
-                Confirmar asistencia
+                {sending ? "Enviando…" : "Confirmar asistencia"}
               </button>
             </motion.form>
           )}
