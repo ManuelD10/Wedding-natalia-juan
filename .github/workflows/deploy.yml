@@ -25,9 +25,7 @@ jobs:
         with:
           node-version: 20
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm run build
-        env:
-          FIGMA_PUBLIC_URL: /wedding-natalia-juan
+      - run: npx vite build --config vite.config.ts
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
